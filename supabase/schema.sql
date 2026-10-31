@@ -1,6 +1,22 @@
 -- CampusFlow — full schema (Auth.js next_auth + app tables).
 -- Paste this ENTIRE file into Supabase → SQL Editor → New query → Run.
--- Idempotent: safe to re-run.
+-- Idempotent: wipes next_auth and the FK-dependent public tables, then
+-- recreates everything from scratch. Safe before first sign-in (no data).
+--
+-- IMPORTANT: After running this, go to Supabase → Project Settings → API →
+-- "Exposed schemas" and add `next_auth` to the comma-separated list, else
+-- the Auth.js SupabaseAdapter cannot reach these tables via PostgREST.
+
+------------------------------------------------------------------
+-- 0) Clean slate.
+------------------------------------------------------------------
+drop schema if exists next_auth cascade;
+drop table if exists public.timer_sessions cascade;
+drop table if exists public.reminder_log  cascade;
+drop table if exists public.tasks         cascade;
+drop table if exists public.subjects      cascade;
+drop table if exists public.semesters     cascade;
+drop table if exists public.user_profiles cascade;
 
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
@@ -9,11 +25,10 @@ create extension if not exists "pgcrypto";
 -- 1) Auth.js (NextAuth v5) Supabase adapter schema: next_auth.*
 --    Source: https://authjs.dev/getting-started/adapters/supabase
 ------------------------------------------------------------------
-create schema if not exists next_auth;
+create schema next_auth;
 grant usage on schema next_auth to service_role;
-grant all on schema next_auth to postgres;
+grant all   on schema next_auth to postgres;
 
--- next_auth.uid() returns the current user's id from the JWT.
 create or replace function next_auth.uid() returns uuid
   language sql stable
 as $$
@@ -23,57 +38,67 @@ as $$
   )::uuid
 $$;
 
-create table if not exists next_auth.users (
-  id            uuid primary key default uuid_generate_v4(),
-  name          text,
-  email         text,
-  "emailVerified" timestamptz,
-  image         text,
-  constraint users_email_unique unique (email)
+create table next_auth.users (
+  id              uuid not null default uuid_generate_v4(),
+  name            text,
+  email           text,
+  "emailVerified" timestamp with time zone,
+  image           text,
+  constraint users_pkey primary key (id),
+  constraint email_unique unique (email)
 );
 grant all on table next_auth.users to postgres, service_role;
 
-create table if not exists next_auth.sessions (
-  id             uuid primary key default uuid_generate_v4(),
-  expires        timestamptz not null,
+create table next_auth.sessions (
+  id             uuid not null default uuid_generate_v4(),
+  expires        timestamp with time zone not null,
   "sessionToken" text not null,
-  "userId"       uuid references next_auth.users(id) on delete cascade,
-  constraint sessions_token_unique unique ("sessionToken")
+  "userId"       uuid,
+  constraint sessions_pkey primary key (id),
+  constraint "sessionToken_unique" unique ("sessionToken"),
+  constraint "sessions_userId_fkey" foreign key ("userId")
+    references next_auth.users (id) match simple
+    on update no action on delete cascade
 );
 grant all on table next_auth.sessions to postgres, service_role;
 
-create table if not exists next_auth.accounts (
-  id                   uuid primary key default uuid_generate_v4(),
-  type                 text not null,
-  provider             text not null,
-  "providerAccountId"  text not null,
-  refresh_token        text,
-  access_token         text,
-  expires_at           bigint,
-  token_type           text,
-  scope                text,
-  id_token             text,
-  session_state        text,
-  oauth_token_secret   text,
-  oauth_token          text,
-  "userId"             uuid references next_auth.users(id) on delete cascade,
-  constraint accounts_provider_unique unique (provider, "providerAccountId")
+create table next_auth.accounts (
+  id                  uuid not null default uuid_generate_v4(),
+  type                text not null,
+  provider            text not null,
+  "providerAccountId" text not null,
+  refresh_token       text,
+  access_token        text,
+  expires_at          bigint,
+  token_type          text,
+  scope               text,
+  id_token            text,
+  session_state       text,
+  oauth_token_secret  text,
+  oauth_token         text,
+  "userId"            uuid,
+  constraint accounts_pkey primary key (id),
+  constraint provider_unique unique (provider, "providerAccountId"),
+  constraint "accounts_userId_fkey" foreign key ("userId")
+    references next_auth.users (id) match simple
+    on update no action on delete cascade
 );
 grant all on table next_auth.accounts to postgres, service_role;
 
-create table if not exists next_auth.verification_tokens (
+create table next_auth.verification_tokens (
   identifier text,
   token      text,
-  expires    timestamptz not null,
+  expires    timestamp with time zone not null,
   constraint verification_tokens_pkey primary key (token),
-  constraint verification_tokens_token_identifier_unique unique (token, identifier)
+  constraint token_unique unique (token),
+  constraint token_identifier_unique unique (token, identifier)
 );
 grant all on table next_auth.verification_tokens to postgres, service_role;
 
 ------------------------------------------------------------------
 -- 2) App tables (public.*) scoped by user_id, with RLS.
 ------------------------------------------------------------------
-create table if not exists public.user_profiles (
+create table public.user_profiles (
   user_id uuid primary key references next_auth.users(id) on delete cascade,
   role text not null default '' check (role in ('', 'student', 'teacher', 'professional')),
   display_name text not null default '',
@@ -90,7 +115,7 @@ create table if not exists public.user_profiles (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.semesters (
+create table public.semesters (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references next_auth.users(id) on delete cascade,
   name text not null,
@@ -99,7 +124,7 @@ create table if not exists public.semesters (
   unique (user_id, name)
 );
 
-create table if not exists public.subjects (
+create table public.subjects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references next_auth.users(id) on delete cascade,
   semester_id uuid references public.semesters(id) on delete cascade,
@@ -108,14 +133,14 @@ create table if not exists public.subjects (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists subjects_user_idx on public.subjects(user_id);
-create index if not exists subjects_semester_idx on public.subjects(semester_id);
+create index subjects_user_idx     on public.subjects(user_id);
+create index subjects_semester_idx on public.subjects(semester_id);
 
-create table if not exists public.tasks (
+create table public.tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references next_auth.users(id) on delete cascade,
   semester_id uuid references public.semesters(id) on delete cascade,
-  subject_id uuid references public.subjects(id) on delete set null,
+  subject_id  uuid references public.subjects(id)  on delete set null,
   title text not null,
   description text not null default '',
   priority text not null default 'medium' check (priority in ('low', 'medium', 'high')),
@@ -131,10 +156,10 @@ create table if not exists public.tasks (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists tasks_user_due_idx on public.tasks(user_id, due_at);
-create index if not exists tasks_user_completed_idx on public.tasks(user_id, completed);
+create index tasks_user_due_idx       on public.tasks(user_id, due_at);
+create index tasks_user_completed_idx on public.tasks(user_id, completed);
 
-create table if not exists public.reminder_log (
+create table public.reminder_log (
   id uuid primary key default gen_random_uuid(),
   task_id uuid not null references public.tasks(id) on delete cascade,
   kind text not null check (kind in ('day_before', 'hour_before', 'at_time')),
@@ -142,21 +167,19 @@ create table if not exists public.reminder_log (
   unique (task_id, kind)
 );
 
-create table if not exists public.timer_sessions (
+create table public.timer_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references next_auth.users(id) on delete cascade,
   task_id uuid references public.tasks(id) on delete set null,
   mode text not null check (mode in ('work', 'break')),
   started_at timestamptz not null,
-  ended_at timestamptz not null,
+  ended_at   timestamptz not null,
   seconds int not null check (seconds >= 0)
 );
-create index if not exists timer_sessions_user_idx on public.timer_sessions(user_id, started_at desc);
+create index timer_sessions_user_idx on public.timer_sessions(user_id, started_at desc);
 
 ------------------------------------------------------------------
--- 3) Row Level Security. API routes authenticate via NextAuth and
---    use the SERVICE ROLE key with user_id filters; RLS is defense
---    in depth for any direct client use.
+-- 3) Row Level Security.
 ------------------------------------------------------------------
 alter table public.user_profiles  enable row level security;
 alter table public.semesters      enable row level security;
@@ -165,43 +188,26 @@ alter table public.tasks          enable row level security;
 alter table public.reminder_log   enable row level security;
 alter table public.timer_sessions enable row level security;
 
-do $$ begin
-  create policy "own profile" on public.user_profiles for all
-    using (user_id = next_auth.uid())
-    with check (user_id = next_auth.uid());
-exception when duplicate_object then null; end $$;
+create policy "own profile" on public.user_profiles for all
+  using (user_id = next_auth.uid()) with check (user_id = next_auth.uid());
 
-do $$ begin
-  create policy "own semesters" on public.semesters for all
-    using (user_id = next_auth.uid())
-    with check (user_id = next_auth.uid());
-exception when duplicate_object then null; end $$;
+create policy "own semesters" on public.semesters for all
+  using (user_id = next_auth.uid()) with check (user_id = next_auth.uid());
 
-do $$ begin
-  create policy "own subjects" on public.subjects for all
-    using (user_id = next_auth.uid())
-    with check (user_id = next_auth.uid());
-exception when duplicate_object then null; end $$;
+create policy "own subjects" on public.subjects for all
+  using (user_id = next_auth.uid()) with check (user_id = next_auth.uid());
 
-do $$ begin
-  create policy "own tasks" on public.tasks for all
-    using (user_id = next_auth.uid())
-    with check (user_id = next_auth.uid());
-exception when duplicate_object then null; end $$;
+create policy "own tasks" on public.tasks for all
+  using (user_id = next_auth.uid()) with check (user_id = next_auth.uid());
 
-do $$ begin
-  create policy "own reminder_log" on public.reminder_log for all
-    using (exists (
-      select 1 from public.tasks t
-      where t.id = reminder_log.task_id and t.user_id = next_auth.uid()
-    ));
-exception when duplicate_object then null; end $$;
+create policy "own reminder_log" on public.reminder_log for all
+  using (exists (
+    select 1 from public.tasks t
+    where t.id = reminder_log.task_id and t.user_id = next_auth.uid()
+  ));
 
-do $$ begin
-  create policy "own timer_sessions" on public.timer_sessions for all
-    using (user_id = next_auth.uid())
-    with check (user_id = next_auth.uid());
-exception when duplicate_object then null; end $$;
+create policy "own timer_sessions" on public.timer_sessions for all
+  using (user_id = next_auth.uid()) with check (user_id = next_auth.uid());
 
 ------------------------------------------------------------------
 -- 4) Trigger: provision a user_profiles row for every new auth user.
@@ -211,6 +217,8 @@ returns trigger language plpgsql security definer as $$
 begin
   insert into public.user_profiles (user_id) values (new.id) on conflict do nothing;
   return new;
+exception when others then
+  return new; -- never let a profile-row hiccup block signup
 end;
 $$;
 
@@ -218,3 +226,11 @@ drop trigger if exists on_auth_user_created on next_auth.users;
 create trigger on_auth_user_created
   after insert on next_auth.users
   for each row execute function public.handle_new_user();
+
+------------------------------------------------------------------
+-- 5) Verify: list every column PostgREST will see.
+------------------------------------------------------------------
+select table_schema, table_name, column_name
+  from information_schema.columns
+ where table_schema in ('next_auth', 'public')
+ order by table_schema, table_name, ordinal_position;
