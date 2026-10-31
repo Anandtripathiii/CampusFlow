@@ -87,3 +87,76 @@ npm run dev
 
 Open <http://localhost:3000>, sign in with Google, pick a role, start adding
 tasks.
+
+---
+
+## 7 — Production deploy on Vercel
+
+The project is live on Vercel after the first green build on `main`.
+
+**Live URL:** `https://<YOUR_VERCEL_URL>`  — grab it from
+<https://vercel.com/dashboard> → the `CampusFlow` project → **Domains**.
+Fill it in everywhere `<YOUR_VERCEL_URL>` appears below.
+
+### Google OAuth redirect URI (production)
+
+In Google Cloud Console → **APIs & Services → Credentials → your OAuth 2.0
+Client ID**, under **Authorized redirect URIs**, add exactly:
+
+```
+https://<YOUR_VERCEL_URL>/api/auth/callback/google
+```
+
+Keep the `http://localhost:3000/api/auth/callback/google` entry too for local
+dev. Save.
+
+### Vercel environment variables — manual checklist
+
+Set each one at Vercel → **Project → Settings → Environment Variables** for
+*Production* (and *Preview* if you want preview deploys to work). Then redeploy.
+
+| # | Name | Value |
+|---|------|-------|
+| 1 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
+| 2 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → `anon public` |
+| 3 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` (server only) |
+| 4 | `AUTH_SECRET` | `openssl rand -base64 32` |
+| 5 | `AUTH_URL` *(and `NEXTAUTH_URL` for compatibility)* | `https://<YOUR_VERCEL_URL>` |
+| 6 | `GOOGLE_CLIENT_ID` | Google Cloud → OAuth client |
+| 7 | `GOOGLE_CLIENT_SECRET` | Google Cloud → OAuth client |
+| 8 | `RESEND_API_KEY` | Resend → API Keys |
+| 9 | `EMAIL_FROM` | e.g. `"CampusFlow <reminders@your-domain.com>"` (verified sender) |
+| 10 | `CRON_SECRET` | Any random string; Vercel Cron sends `Authorization: Bearer $CRON_SECRET` |
+
+Variables listed as "server only" must **not** have `NEXT_PUBLIC_` in front —
+anything with that prefix is shipped to the browser.
+
+### Database migration
+
+Before the first production sign-in, run two SQL blocks in Supabase → **SQL
+Editor**:
+
+1. **Auth.js `next_auth` schema** — paste the migration from
+   <https://authjs.dev/getting-started/adapters/supabase> (section
+   *"Create the Supabase schema"*). It creates
+   `next_auth.users / accounts / sessions / verification_tokens`.
+2. **App tables + RLS** — paste `supabase/schema.sql` from this repo.
+   Creates `user_profiles`, `semesters`, `subjects`, `tasks`,
+   `reminder_log`, `timer_sessions`, enables RLS with per-user policies,
+   and installs the trigger that provisions a profile row for each new
+   user.
+
+### Cron
+
+`vercel.json` schedules `/api/cron/reminders` daily at `09:00 UTC` (Hobby
+plan limit). For minute-accurate reminders see [`NOTE.md`](./NOTE.md).
+
+### Confirm it works
+
+1. Visit `https://<YOUR_VERCEL_URL>`.
+2. **Sign in with Google** → consent to Calendar access.
+3. Pick a role on `/onboarding`.
+4. Add a semester, add a task with a due time in the next few minutes.
+5. The reminder cron will fire at the next 09:00 UTC run (or sooner via
+   cron-job.org — see `NOTE.md`). Calendar sync fires immediately when a
+   task has a due time.

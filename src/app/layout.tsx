@@ -1,9 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "CampusFlow — Your semester, in flow",
   description: "A calm, focused dashboard for staying ahead of student, teacher and professional life.",
+};
+
+export const viewport: Viewport = {
   themeColor: "#f6f7fb",
 };
 
