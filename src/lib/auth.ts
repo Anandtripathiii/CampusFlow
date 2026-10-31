@@ -7,10 +7,14 @@ import { serverSupabase } from "./supabase";
 // back only on the first consent, so we also pass access_type=offline + prompt.
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
+// Fallbacks keep the module importable during `next build` (page-data
+// collection evaluates every route). They are never used in a running request:
+// a request without real env values fails loudly when the adapter talks to
+// Supabase, which is the correct place to notice.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: SupabaseAdapter({
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost",
+    secret: process.env.SUPABASE_SERVICE_ROLE_KEY || "build-placeholder",
   }),
   session: { strategy: "database" },
   secret: process.env.AUTH_SECRET,

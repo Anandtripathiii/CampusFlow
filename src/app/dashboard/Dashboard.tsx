@@ -237,7 +237,7 @@ export default function Dashboard({ initial }: {
             breakMin={profile.pomodoro_break_minutes}
             activeTask={timerTask}
             tasks={tasks.filter((t) => !t.completed)}
-            onPickTask={setTimerTask}
+            onPickTask={(t) => setTimerTask(t ? tasks.find((x) => x.id === t.id) ?? null : null)}
           />
         </section>
 
