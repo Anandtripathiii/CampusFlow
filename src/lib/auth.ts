@@ -3,8 +3,8 @@ import Google from "next-auth/providers/google";
 import { SupabaseAdapter } from "@auth/supabase-adapter";
 import { serverSupabase } from "./supabase";
 
-// Google Calendar read/write when the user grants it. The refresh_token comes
-// back only on the first consent, so we also pass access_type=offline + prompt.
+// Google Calendar read/write when the user grants it. access_type=offline gets
+// us a refresh_token on first consent so calendar sync can run server-side.
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
 // Fallbacks keep the module importable during `next build` (page-data
@@ -25,13 +25,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: `openid email profile ${CALENDAR_SCOPE}`,
+          prompt: "select_account",
           access_type: "offline",
-          prompt: "consent",
+          response_type: "code",
+          scope: `openid email profile ${CALENDAR_SCOPE}`,
         },
       },
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
+  // Explicit cookie names + options so the PKCE verifier cookie is reliably
+  // set and read across the OAuth round-trip on Vercel. Without this, the
+  // __Secure-prefixed default name can mismatch between set and read in some
+  // runtime configurations and the callback fails with "Invalid code verifier".
+  cookies: {
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: true, maxAge: 900 },
+    },
+    state: {
+      name: "next-auth.state",
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: true, maxAge: 900 },
+    },
+  },
   callbacks: {
     async session({ session, user }) {
       if (session.user) (session.user as { id?: string }).id = user.id;

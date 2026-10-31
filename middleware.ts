@@ -23,6 +23,9 @@ export function middleware(_req: NextRequest) {
   return res;
 }
 
+// Exclude /api/auth/* so the OAuth callback response goes back to the
+// browser untouched — adding headers to a redirect is harmless, but keeping
+// NextAuth paths out of the middleware eliminates any chance of interference.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
 };
