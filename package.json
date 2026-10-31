@@ -1,0 +1,30 @@
+{
+  "name": "campusflow-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@auth/supabase-adapter": "^1.7.4",
+    "@supabase/supabase-js": "^2.45.4",
+    "googleapis": "^144.0.0",
+    "lucide-react": "^0.460.0",
+    "next": "15.0.3",
+    "next-auth": "5.0.0-beta.25",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "resend": "^4.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.3"
+  }
+}
