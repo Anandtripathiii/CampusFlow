@@ -2,67 +2,75 @@
 
 > Your semester, in flow.
 
-One place to manage study and work life. Tasks with priorities, due dates, and
-email reminders. Semesters, subjects, roles. Pomodoro timer. Google Calendar
-sync.
+CampusFlow is one calm place to keep your study and work life together.
+Students track semesters, subjects and assignments. Teachers plan classes
+and grading. Working professionals keep projects, deadlines and meetings in
+one list. Everyone gets reminders by email, a Pomodoro timer, and a sync
+with Google Calendar.
 
-## Stack
+## Features
 
-- Next.js 15 (App Router, TypeScript, React 19)
-- NextAuth v5 (Auth.js) — Google OAuth, database sessions via Supabase adapter
-- Supabase Postgres — per-user RLS; `semesters → subjects → tasks` with
-  `ON DELETE CASCADE`
-- Zod on every API boundary
-- Resend for email, scheduled by Vercel Cron
-- `googleapis` for Calendar sync
-- Custom CSS (no gradients, no framework) — tokens ported from the design
-  reference in `../`
+- **Sign in with Google** — OAuth 2.0 via NextAuth v5.
+- **Pick a role** — Student, Teacher, or Working Professional. The dashboard
+  adapts.
+- **Tasks** — title, description, due date & time, priority, tag, bind to a
+  semester or subject. Views: Today, Upcoming (next 7 days), All, By semester.
+  Drag to reorder, click to complete (with strikethrough), edit, delete.
+- **Semesters & subjects** — manage from the sidebar. Deleting a semester
+  cascades to its subjects and tasks at the database level.
+- **Email reminders** — 1 day before, 1 hour before, at the time. Per-task
+  toggles plus a global default in settings. Fired by Vercel Cron (every 5
+  minutes) → Resend.
+- **Google Calendar sync** — tasks with a due time create/update/delete
+  events on the user's primary calendar.
+- **Pomodoro timer** — configurable work/break, optional task link, soft
+  WebAudio chime, logged per session.
+- **Dark / light / system** theme.
 
-## Run
+## Tech stack
 
-See [SETUP.md](./SETUP.md) for env setup.
+- **Next.js 15** (App Router, React 19, TypeScript)
+- **NextAuth v5 (Auth.js)** with Google provider
+- **Supabase Postgres** with per-user Row Level Security
+- **Zod** on every API boundary
+- **Resend** for email, **Vercel Cron** for scheduling
+- **googleapis** for Calendar
+- Custom CSS, no gradients, design tokens ported from the vanilla reference
+
+## Run locally
 
 ```bash
+cd campusflow-app
 npm install
-npm run dev
+cp .env.example .env.local        # then fill the values
+npm run dev                       # http://localhost:3000
 ```
 
-## Project layout
+## Environment variables
 
-```
-campusflow-app/
-├── middleware.ts            # CSP + security headers
-├── vercel.json              # cron: /api/cron/reminders every 5 min
-├── supabase/schema.sql      # app tables, RLS, triggers
-└── src/
-    ├── app/
-    │   ├── layout.tsx, globals.css, page.tsx
-    │   ├── signin/, onboarding/, dashboard/, settings/
-    │   └── api/{auth,profile,semesters,subjects,tasks,timer,calendar,cron}/…
-    ├── components/
-    │   └── PomodoroTimer.tsx
-    └── lib/
-        ├── auth.ts          # NextAuth config
-        ├── supabase.ts      # server client (service role)
-        ├── zod.ts           # input schemas
-        ├── api.ts           # auth + validation helpers
-        ├── email.ts         # Resend wrapper
-        ├── calendar.ts      # Google Calendar wrapper
-        └── rate-limit.ts    # in-memory sliding window
-```
+Full list and where to get each one is in [`.env.example`](./.env.example) and
+[`SETUP.md`](./SETUP.md). Short version:
 
-## Security
+| Name | What |
+|---|---|
+| `AUTH_SECRET` | `openssl rand -base64 32` |
+| `AUTH_URL` | `http://localhost:3000` locally, your prod URL on Vercel |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud → OAuth 2.0 Client |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Resend dashboard |
+| `CRON_SECRET` | Any random string (also set in Vercel) |
 
-- Every API route calls `withUser()` → 401 if no session.
-- Every DB query filters by `user_id`. RLS is enabled as defense in depth.
-- Every API body goes through Zod before touching the DB.
-- Service-role Supabase key only on the server (never in `NEXT_PUBLIC_*`).
-- Session cookies: httpOnly, secure in production, SameSite=Lax (NextAuth
-  defaults; not weakened).
-- `middleware.ts` sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options,
-  Referrer-Policy, Permissions-Policy.
-- Cron endpoint requires `Authorization: Bearer $CRON_SECRET`.
-- No passwords stored — Google OAuth only.
-- Email body is HTML-escaped.
-- Rate-limiting on `POST /api/semesters` (sample). Add to more routes as needed
-  (see `src/lib/rate-limit.ts`).
+Before first sign-in, run the Auth.js `next_auth` migration (link in SETUP.md
+step 3), then run `supabase/schema.sql` in the Supabase SQL editor.
+
+## Deploy
+
+1. Push to GitHub.
+2. In Vercel, **New Project** → import this repo (root `campusflow-app`).
+3. Add every variable above in **Project → Settings → Environment Variables**.
+   Set `AUTH_URL` to the Vercel URL once you know it.
+4. Add the Vercel URL to Google OAuth **Authorized redirect URIs**:
+   `https://<your-app>.vercel.app/api/auth/callback/google`.
+5. `vercel.json` already schedules `/api/cron/reminders` every 5 minutes.
+
+See [SETUP.md](./SETUP.md) for the full step-by-step.
