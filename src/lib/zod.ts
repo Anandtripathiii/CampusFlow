@@ -42,6 +42,14 @@ export const ProfilePatch = z.object({
   reminder_default_hour_before: z.boolean().optional(),
   reminder_default_at_time: z.boolean().optional(),
   current_semester_id: z.string().uuid().nullable().optional(),
+  onboarding_completed: z.boolean().optional(),
+  institution: z.string().max(120).optional(),
+  course_or_department: z.string().max(120).optional(),
+  current_year: z.string().max(40).optional(),
+  company: z.string().max(120).optional(),
+  job_title: z.string().max(120).optional(),
+  team: z.string().max(120).optional(),
+  goals: z.array(z.string().max(60)).max(20).optional(),
 });
 
 export const TimerSessionInput = z.object({
