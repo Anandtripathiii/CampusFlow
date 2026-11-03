@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate": "node scripts/run-migration.js"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.7.4",
@@ -16,6 +17,7 @@
     "lucide-react": "^0.460.0",
     "next": "^15.5.28",
     "next-auth": "5.0.0-beta.25",
+    "pg": "^8.23.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "resend": "^4.0.1",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "typescript": "^5.6.3"
