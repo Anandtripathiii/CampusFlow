@@ -11,3 +11,7 @@ build
 .vercel
 next-env.d.ts
 coverage
+*.tsbuildinfo
+test-results
+playwright-report
+
