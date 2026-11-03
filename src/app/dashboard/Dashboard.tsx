@@ -20,10 +20,74 @@ type Profile = {
 };
 type View = "today" | "upcoming" | "all" | "bySemester";
 
+type RoleCopy = {
+  eyebrow: string;
+  taskWord: string;
+  taskWordPlural: string;
+  addTaskLabel: string;
+  tasksSectionTitle: string;
+  statLabels: { total: string; today: string; done: string; overdue: string };
+  secondarySectionTitle: string;
+  secondaryEmpty: string;
+  secondaryAddLabel: string;
+};
+
+const ROLE_COPY: Record<"student" | "teacher" | "professional" | "default", RoleCopy> = {
+  student: {
+    eyebrow: "Current semester",
+    taskWord: "assignment", taskWordPlural: "Assignments",
+    addTaskLabel: "+ Add assignment",
+    tasksSectionTitle: "Assignments",
+    statLabels: { total: "Total", today: "Due today", done: "Completed", overdue: "Overdue" },
+    secondarySectionTitle: "Subjects",
+    secondaryEmpty: "Add your first subject to organize assignments by course.",
+    secondaryAddLabel: "+ Add subject",
+  },
+  teacher: {
+    eyebrow: "Today's classes",
+    taskWord: "task", taskWordPlural: "Pending work",
+    addTaskLabel: "+ Add class task",
+    tasksSectionTitle: "To grade & plan",
+    statLabels: { total: "Items", today: "Due today", done: "Done", overdue: "Overdue" },
+    secondarySectionTitle: "Classes & subjects",
+    secondaryEmpty: "Add the classes you teach to see them grouped here.",
+    secondaryAddLabel: "+ Add class",
+  },
+  professional: {
+    eyebrow: "Today's priorities",
+    taskWord: "task", taskWordPlural: "Tasks",
+    addTaskLabel: "+ Add task",
+    tasksSectionTitle: "Tasks",
+    statLabels: { total: "Total", today: "Due today", done: "Completed", overdue: "Overdue" },
+    secondarySectionTitle: "Projects",
+    secondaryEmpty: "Add a project to group related work and deadlines.",
+    secondaryAddLabel: "+ Add project",
+  },
+  default: {
+    eyebrow: "Current term",
+    taskWord: "task", taskWordPlural: "Tasks",
+    addTaskLabel: "+ Add task",
+    tasksSectionTitle: "Tasks",
+    statLabels: { total: "Total tasks", today: "Due today", done: "Completed", overdue: "Overdue" },
+    secondarySectionTitle: "Subjects",
+    secondaryEmpty: "Create a subject to organize your task queue.",
+    secondaryAddLabel: "+ Add subject",
+  },
+};
+
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) } });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5)  return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  if (h < 21) return "Good evening";
+  return "Good night";
 }
 
 function fmtDue(iso: string | null): string {
@@ -39,6 +103,7 @@ export default function Dashboard({ initial }: {
   initial: { profile: Profile; semesters: Semester[]; subjects: Subject[]; tasks: Task[]; userName: string };
 }) {
   const [profile, setProfile] = useState<Profile>(initial.profile);
+  const copy = ROLE_COPY[(initial.profile.role as keyof typeof ROLE_COPY)] ?? ROLE_COPY.default;
   const [semesters, setSemesters] = useState<Semester[]>(initial.semesters);
   const [subjects, setSubjects] = useState<Subject[]>(initial.subjects);
   const [tasks, setTasks] = useState<Task[]>(initial.tasks);
@@ -132,7 +197,7 @@ export default function Dashboard({ initial }: {
         <a className="brand" href="/dashboard"><span className="brand__mark">C</span>CampusFlow</a>
 
         <div className="card" style={{ padding: "0.9rem 1rem" }}>
-          <p className="eyebrow">Current term</p>
+          <p className="eyebrow">{copy.eyebrow}</p>
           <strong style={{ display: "block" }}>{semesters.find((s) => s.id === profile.current_semester_id)?.name ?? "No term set"}</strong>
           <small style={{ color: "var(--color-ink-soft)" }}>{stats.done} / {stats.total} done</small>
           <select
@@ -171,22 +236,22 @@ export default function Dashboard({ initial }: {
       <main className="main">
         <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem" }}>
           <div>
-            <p className="eyebrow">Welcome back</p>
-            <h1 style={{ fontSize: "1.8rem" }}>{initial.userName}</h1>
+            <p className="eyebrow">{greeting()}</p>
+            <h1 style={{ fontSize: "1.8rem" }}>{profile.display_name || initial.userName}</h1>
           </div>
-          <button className="button button--primary" onClick={() => setAdding(true)}>+ Add task</button>
+          <button className="button button--primary" onClick={() => setAdding(true)}>{copy.addTaskLabel}</button>
         </header>
 
         <section className="stats">
-          <div className="stat"><div className="stat__label">Total tasks</div><div className="stat__value">{stats.total}</div></div>
-          <div className="stat"><div className="stat__label">Due today</div><div className="stat__value">{stats.today}</div></div>
-          <div className="stat"><div className="stat__label">Completed</div><div className="stat__value">{stats.done}</div></div>
-          <div className="stat"><div className="stat__label">Overdue</div><div className="stat__value">{stats.overdue}</div></div>
+          <div className="stat"><div className="stat__label">{copy.statLabels.total}</div><div className="stat__value">{stats.total}</div></div>
+          <div className="stat"><div className="stat__label">{copy.statLabels.today}</div><div className="stat__value">{stats.today}</div></div>
+          <div className="stat"><div className="stat__label">{copy.statLabels.done}</div><div className="stat__value">{stats.done}</div></div>
+          <div className="stat"><div className="stat__label">{copy.statLabels.overdue}</div><div className="stat__value">{stats.overdue}</div></div>
         </section>
 
         <section className="panel">
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "1rem" }}>
-            <h2>{view === "today" ? "Today" : view === "upcoming" ? "Next 7 days" : view === "bySemester" ? "By semester" : "All tasks"}</h2>
+            <h2>{view === "today" ? "Today" : view === "upcoming" ? "Next 7 days" : view === "bySemester" ? "By semester" : copy.tasksSectionTitle}</h2>
             <small style={{ color: "var(--color-ink-soft)" }}>{filtered.length} shown</small>
           </div>
           {view === "bySemester" ? (
@@ -196,19 +261,19 @@ export default function Dashboard({ initial }: {
           )}
           {filtered.length === 0 && (
             <div className="empty">
-              <p style={{ marginBottom: "0.75rem" }}>Nothing here yet.</p>
-              <button className="button button--primary" onClick={() => setAdding(true)}>Add your first task</button>
+              <p style={{ marginBottom: "0.75rem" }}>No {copy.taskWord}s here yet.</p>
+              <button className="button button--primary" onClick={() => setAdding(true)}>{copy.addTaskLabel}</button>
             </div>
           )}
         </section>
 
         <section className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
-            <h2>Subjects</h2>
-            <button className="button" onClick={() => setAddingSubj(true)}>+ Add subject</button>
+            <h2>{copy.secondarySectionTitle}</h2>
+            <button className="button" onClick={() => setAddingSubj(true)}>{copy.secondaryAddLabel}</button>
           </div>
           {subjects.length === 0 ? (
-            <div className="empty"><p>Create a subject to organize your task queue.</p></div>
+            <div className="empty"><p>{copy.secondaryEmpty}</p></div>
           ) : (
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.5rem" }}>
               {subjects.map((s) => (
