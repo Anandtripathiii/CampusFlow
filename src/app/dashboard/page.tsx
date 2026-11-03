@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { serverSupabase } from "@/lib/supabase";
-import Dashboard from "./Dashboard";
+import StudentDashboard from "@/components/dashboards/StudentDashboard";
+import TeacherDashboard from "@/components/dashboards/TeacherDashboard";
+import ProfessionalDashboard from "@/components/dashboards/ProfessionalDashboard";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -17,15 +19,17 @@ export default async function DashboardPage() {
   ]);
   if (!profile.data?.role) redirect("/onboarding");
 
-  return (
-    <Dashboard
-      initial={{
-        profile: profile.data,
-        semesters: semesters.data ?? [],
-        subjects: subjects.data ?? [],
-        tasks: tasks.data ?? [],
-        userName: session.user.name ?? session.user.email ?? "",
-      }}
-    />
-  );
+  const initial = {
+    profile: profile.data,
+    semesters: semesters.data ?? [],
+    subjects: subjects.data ?? [],
+    tasks: tasks.data ?? [],
+    userName: session.user.name ?? session.user.email ?? "",
+  };
+
+  switch (profile.data.role) {
+    case "teacher":      return <TeacherDashboard initial={initial} />;
+    case "professional": return <ProfessionalDashboard initial={initial} />;
+    default:             return <StudentDashboard initial={initial} />;
+  }
 }

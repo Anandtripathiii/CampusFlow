@@ -99,9 +99,9 @@ function fmtDue(iso: string | null): string {
   return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function Dashboard({ initial }: {
-  initial: { profile: Profile; semesters: Semester[]; subjects: Subject[]; tasks: Task[]; userName: string };
-}) {
+export type DashboardInitial = { profile: Profile; semesters: Semester[]; subjects: Subject[]; tasks: Task[]; userName: string };
+
+export default function Dashboard({ initial }: { initial: DashboardInitial }) {
   const [profile, setProfile] = useState<Profile>(initial.profile);
   const copy = ROLE_COPY[(initial.profile.role as keyof typeof ROLE_COPY)] ?? ROLE_COPY.default;
   const [semesters, setSemesters] = useState<Semester[]>(initial.semesters);
