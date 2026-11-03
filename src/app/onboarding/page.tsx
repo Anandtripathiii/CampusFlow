@@ -150,7 +150,7 @@ export default function Onboarding() {
           <>
             <p className="eyebrow">Step 3 of 3</p>
             <h1 style={{ fontSize: "1.6rem", marginBottom: "0.3rem" }}>What do you want to track?</h1>
-            <p style={{ color: "var(--color-ink-soft)", margin: "0 0 1rem" }}>Pick any that apply — we'll surface these first.</p>
+            <p style={{ color: "var(--color-ink-soft)", margin: "0 0 1rem" }}>Pick any that apply &mdash; we&apos;ll surface these first.</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.5rem" }}>
               {GOALS[role].map((g) => {
                 const on = v.goals.includes(g);
